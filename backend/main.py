@@ -67,3 +67,12 @@ def api_genre_stats():
         return fetch_genre_stats(conn)
     finally:
         conn.close()
+
+@app.get("/api/eras")
+def api_eras():
+    conn = database.get_db_connection()
+    try:
+        from analysis.eras import get_era_stats
+        return get_era_stats(conn)
+    finally:
+        conn.close()
