@@ -59,3 +59,11 @@ def api_behavioral_stats():
         conn.close()
 
 # Routers will be included here as we build them out
+@app.get("/api/genre_stats")
+def api_genre_stats():
+    conn = database.get_db_connection()
+    try:
+        from analysis.genres import fetch_genre_stats
+        return fetch_genre_stats(conn)
+    finally:
+        conn.close()

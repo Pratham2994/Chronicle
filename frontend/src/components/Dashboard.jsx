@@ -17,20 +17,24 @@ const itemVariants = {
 export default function Dashboard() {
   const [coreStats, setCoreStats] = useState(null);
   const [behavioralStats, setBehavioralStats] = useState(null);
+  const [genreStats, setGenreStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showSkipperInfo, setShowSkipperInfo] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [coreRes, behaviorRes] = await Promise.all([
+        const [coreRes, behaviorRes, genreRes] = await Promise.all([
           fetch('http://localhost:8000/api/core_stats'),
-          fetch('http://localhost:8000/api/behavioral_stats')
+          fetch('http://localhost:8000/api/behavioral_stats'),
+          fetch('http://localhost:8000/api/genre_stats')
         ]);
         const core = await coreRes.json();
         const behavior = await behaviorRes.json();
+        const genres = await genreRes.json();
         setCoreStats(core);
         setBehavioralStats(behavior);
+        setGenreStats(genres);
       } catch (e) {
         console.error("Failed to fetch telemetry:", e);
       } finally {
@@ -61,7 +65,7 @@ export default function Dashboard() {
     );
   }
 
-  if (!coreStats || !behavioralStats) return <div className="text-white font-mono p-12 bg-black min-h-screen flex items-center justify-center">[ ERR: INSUFFICIENT TELEMETRY DATA ]</div>;
+  if (!coreStats || !behavioralStats || !genreStats) return <div className="text-white font-mono p-12 bg-black min-h-screen flex items-center justify-center">[ ERR: INSUFFICIENT TELEMETRY DATA ]</div>;
 
   const { coefficients, insight } = behavioralStats.skipper_psychology;
 
@@ -383,6 +387,91 @@ export default function Dashboard() {
                 </table>
               </div>
             </div>
+          </div>
+
+          {/* Core Genre Breakdown */}
+          <div className="glass-panel p-8 mt-8 border-t-2 border-t-highlight-yellow">
+             <h3 className="font-mono text-highlight-yellow text-xs tracking-widest mb-2">04 // GENRE ARCHITECTURE</h3>
+             <p className="text-white/40 text-[10px] uppercase mb-8 font-mono leading-relaxed">Aggregated sonic taxonomy based on your top 150 historically most played artists via Spotify API.</p>
+             
+             <div className="space-y-4">
+               {genreStats.top_genres.map((item, idx) => {
+                 const maxHours = genreStats.top_genres[0].hours;
+                 const widthPct = Math.max(5, (item.hours / maxHours) * 100);
+                 return (
+                   <div key={idx} className="flex flex-col gap-2 group">
+                     <div className="flex items-center gap-4">
+                       <div className="w-1/4 font-mono text-xs uppercase text-white/80 group-hover:text-white truncate pr-4 text-right">
+                         {item.genre}
+                       </div>
+                       <div className="flex-1 h-3 bg-black/50 rounded-sm overflow-hidden flex items-center">
+                         <div 
+                           className="h-full bg-gradient-to-r from-highlight-yellow/50 to-highlight-yellow" 
+                           style={{ width: widthPct + '%' }}
+                         ></div>
+                       </div>
+                       <div className="w-20 font-mono text-xs text-highlight-yellow font-bold text-left">
+                         {item.hours} <span className="text-white/30 font-normal">HRS</span>
+                       </div>
+                     </div>
+                     <div className="w-full flex justify-end">
+                       <div className="w-3/4 font-mono text-[9px] text-white/30 uppercase tracking-widest pl-4">
+                         {item.artists && item.artists.length > 0 ? `e.g. ${item.artists.join(', ')}` : ''}
+                       </div>
+                     </div>
+                   </div>
+                 )
+               })}
+             </div>
+             
+             {/* Sub-genre stats cross-referenced with time and Culture */}
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-12 pt-8 border-t border-white/5">
+                <div>
+                  <h4 className="font-mono text-electric-amethyst text-[10px] tracking-widest uppercase mb-4">Vampire Soundscapes</h4>
+                  <p className="text-[9px] text-white/30 mb-4 font-mono">Top genres played 11PM - 5AM</p>
+                  <ul className="space-y-2">
+                    {genreStats.vampire_genres.map((g, idx) => (
+                      <li key={idx} className="flex justify-between font-mono text-xs">
+                        <span className="text-white/80">{g.genre}</span>
+                        <span className="text-electric-amethyst">{g.hours}h</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-mono text-highlight-cyan text-[10px] tracking-widest uppercase mb-4">Sunlight Soundscapes</h4>
+                  <p className="text-[9px] text-white/30 mb-4 font-mono">Top genres played 9AM - 5PM</p>
+                  <ul className="space-y-2">
+                    {genreStats.sunlight_genres.map((g, idx) => (
+                      <li key={idx} className="flex justify-between font-mono text-xs">
+                        <span className="text-white/80">{g.genre}</span>
+                        <span className="text-highlight-cyan">{g.hours}h</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <h4 className="font-mono text-highlight-yellow text-[10px] tracking-widest uppercase mb-4">Cultural Footprint</h4>
+                  <p className="text-[9px] text-white/30 mb-4 font-mono">Global Western vs Regional/World splits</p>
+                  <ul className="space-y-2">
+                    {genreStats.cultural_split.map((c, idx) => {
+                      const totalMs = genreStats.cultural_split.reduce((acc, curr) => acc + curr.ms_played, 0);
+                      const pct = Math.round((c.ms_played / totalMs) * 100) || 0;
+                      return (
+                        <li key={idx} className="flex flex-col gap-1 font-mono text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-white/80">{c.cultural_category}</span>
+                            <span className="text-highlight-yellow">{pct}%</span>
+                          </div>
+                          <div className="w-full h-1 bg-black/50 rounded-full overflow-hidden">
+                            <div className="h-full bg-highlight-yellow/50" style={{ width: `${pct}%` }}></div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+             </div>
           </div>
         </motion.section>
 
