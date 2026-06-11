@@ -85,3 +85,13 @@ def api_geo():
         return get_geo_stats(conn)
     finally:
         conn.close()
+
+@app.post("/api/recalibrate")
+def api_recalibrate():
+    try:
+        import database
+        database.recalibrate_db()
+        return {"status": "success", "message": "Chronicle Engine Recalibrated"}
+    except Exception as e:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=500, detail=str(e))

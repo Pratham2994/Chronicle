@@ -1,13 +1,24 @@
-# Python-generated files
-__pycache__/
+# Node/Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.eslintcache
+
+# Python/Backend
+backend/__pycache__/
+backend/.venv/
 *.py[oc]
-build/
-dist/
-wheels/
-*.egg-info
+backend/itunes_genre_cache.json
+backend/spotify_history.duckdb*
 
-# Virtual environments
-.venv
+# Environment
 .env
+.env.local
 
+# Spotify Raw Data
 data/
+ReadMeFirst_ExtendedStreamingHistory.pdf
+
+# OS junk
+.DS_Store
+Thumbs.db
+agents.md
