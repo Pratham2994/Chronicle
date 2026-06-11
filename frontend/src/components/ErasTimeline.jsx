@@ -224,7 +224,9 @@ export default function ErasTimeline() {
           Eras & <span className="text-transparent bg-clip-text bg-gradient-to-r from-highlight-yellow to-highlight-cyan">Evolution</span>
         </h2>
         <p className="text-white/40 font-mono text-sm max-w-2xl leading-relaxed">
-          Tracing the structural shift in your sonic identity from your high school days through your engineering degree.
+          Your life sliced into distinct academic and cultural chapters. Each era reveals its own sonic taxonomy.
+          <br/><br/>
+          <span className="text-highlight-yellow/50 text-[10px] uppercase tracking-widest">* Note: Chronological boundaries are calibrated approximately for a 2004 birth year.</span>
         </p>
       </motion.div>
 

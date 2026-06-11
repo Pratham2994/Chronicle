@@ -76,3 +76,12 @@ def api_eras():
         return get_era_stats(conn)
     finally:
         conn.close()
+
+@app.get("/api/geo")
+def api_geo():
+    conn = database.get_db_connection()
+    try:
+        from analysis.geo import get_geo_stats
+        return get_geo_stats(conn)
+    finally:
+        conn.close()

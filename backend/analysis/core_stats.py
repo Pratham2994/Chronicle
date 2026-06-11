@@ -23,6 +23,31 @@ def get_core_stats(conn: duckdb.DuckDBPyConnection) -> dict:
     total_hours = total_ms / (1000 * 60 * 60)
     total_days = total_hours / 24
 
+    # Calculate Longest Listening Streak
+    streak_df = conn.execute("""
+        SELECT DISTINCT CAST(parsed_ts AS DATE) as play_date
+        FROM history
+        WHERE parsed_ts IS NOT NULL
+        ORDER BY play_date
+    """).df()
+    
+    max_streak = 0
+    current_streak = 0
+    prev_date = None
+    for d in streak_df['play_date']:
+        if prev_date is None:
+            current_streak = 1
+        else:
+            if (d - prev_date).days == 1:
+                current_streak += 1
+            else:
+                current_streak = 1
+        max_streak = max(max_streak, current_streak)
+        prev_date = d
+
+    # Number of unique artists
+    unique_artists = conn.execute("SELECT COUNT(DISTINCT master_metadata_album_artist_name) FROM history WHERE master_metadata_album_artist_name IS NOT NULL").fetchone()[0]
+
     # Top 50 Artists
     top_artists_df = conn.execute("""
         SELECT master_metadata_album_artist_name as name, count(*) as count 
@@ -78,6 +103,8 @@ def get_core_stats(conn: duckdb.DuckDBPyConnection) -> dict:
     return {
         "total_hours": round(total_hours, 2),
         "total_days": round(total_days, 2),
+        "total_artists": int(unique_artists),
+        "longest_streak": max_streak,
         "top_artists": top_artists,
         "top_tracks": top_tracks,
         "offline_survival_tracks": offline_survival_tracks,

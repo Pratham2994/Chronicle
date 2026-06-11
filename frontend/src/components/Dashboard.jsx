@@ -14,7 +14,7 @@ const itemVariants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] } }
 };
 
-export default function Dashboard() {
+export default function Dashboard({ onLoaded }) {
   const [coreStats, setCoreStats] = useState(null);
   const [behavioralStats, setBehavioralStats] = useState(null);
   const [genreStats, setGenreStats] = useState(null);
@@ -35,6 +35,7 @@ export default function Dashboard() {
         setCoreStats(core);
         setBehavioralStats(behavior);
         setGenreStats(genres);
+        if (onLoaded) onLoaded();
       } catch (e) {
         console.error("Failed to fetch telemetry:", e);
       } finally {
@@ -83,7 +84,7 @@ export default function Dashboard() {
             Chronicle <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-electric-amethyst to-highlight-cyan">Telemetry</span>
           </motion.h1>
           
-          <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-8 font-mono border-t border-white/10 pt-8 mt-8">
+          <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-5 gap-8 font-mono border-t border-white/10 pt-8 mt-8">
             <div>
               <div className="text-white/40 text-xs mb-2 tracking-widest">LIFETIME PLAYTIME</div>
               <div className="text-3xl text-white">{coreStats.total_hours.toLocaleString()} <span className="text-sm text-white/50">HRS</span></div>
@@ -103,6 +104,11 @@ export default function Dashboard() {
               <div className="text-white/40 text-xs mb-2 tracking-widest">LOYALTY INDEX</div>
               <div className="text-3xl text-highlight-cyan">{behavioralStats.loyalty_index.loyalty_percent}%</div>
               <p className="text-[10px] text-white/30 mt-2 uppercase tracking-wide">Playtime by top 5 artists</p>
+            </div>
+            <div>
+              <div className="text-white/40 text-xs mb-2 tracking-widest">LONGEST STREAK</div>
+              <div className="text-3xl text-highlight-yellow">{coreStats.longest_streak || 0}</div>
+              <p className="text-[10px] text-white/30 mt-2 uppercase tracking-wide">Consecutive Days Active</p>
             </div>
           </motion.div>
         </motion.div>
