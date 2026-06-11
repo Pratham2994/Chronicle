@@ -76,25 +76,29 @@ export default function Dashboard() {
             Listener Behavioral Profile
           </motion.p>
           <motion.h1 variants={itemVariants} className="text-6xl md:text-8xl font-black tracking-tighter uppercase leading-none mb-12">
-            The All-Time <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-electric-amethyst to-highlight-cyan">Hyper-Wrapped</span>
+            Chronicle <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-electric-amethyst to-highlight-cyan">Telemetry</span>
           </motion.h1>
           
           <motion.div variants={itemVariants} className="grid grid-cols-2 md:grid-cols-4 gap-8 font-mono border-t border-white/10 pt-8 mt-8">
             <div>
               <div className="text-white/40 text-xs mb-2 tracking-widest">LIFETIME PLAYTIME</div>
               <div className="text-3xl text-white">{coreStats.total_hours.toLocaleString()} <span className="text-sm text-white/50">HRS</span></div>
+              <p className="text-[10px] text-white/30 mt-2 uppercase tracking-wide">Total raw audio processed</p>
             </div>
             <div>
               <div className="text-white/40 text-xs mb-2 tracking-widest">LIFETIME DAYS</div>
               <div className="text-3xl text-white">{coreStats.total_days.toLocaleString()} <span className="text-sm text-white/50">DAYS</span></div>
+              <p className="text-[10px] text-white/30 mt-2 uppercase tracking-wide">Consecutive 24/7 playback</p>
             </div>
             <div>
               <div className="text-white/40 text-xs mb-2 tracking-widest">VAMPIRE/SUN RATIO</div>
               <div className="text-3xl text-electric-amethyst">{behavioralStats.vampire_vs_sunlight.ratio}x</div>
+              <p className="text-[10px] text-white/30 mt-2 uppercase tracking-wide">Night (11pm-5am) vs Day listening</p>
             </div>
             <div>
               <div className="text-white/40 text-xs mb-2 tracking-widest">LOYALTY INDEX</div>
               <div className="text-3xl text-highlight-cyan">{behavioralStats.loyalty_index.loyalty_percent}%</div>
+              <p className="text-[10px] text-white/30 mt-2 uppercase tracking-wide">Playtime by top 5 artists</p>
             </div>
           </motion.div>
         </motion.div>
@@ -221,8 +225,24 @@ export default function Dashboard() {
               <div className="text-white/50 text-xs font-mono">Guilty pleasure sessions</div>
             </div>
 
+            {/* Time Preferences */}
+            <div className="glass-panel p-6 group md:col-span-2 lg:col-span-1 border-t border-t-highlight-yellow">
+              <h3 className="font-mono text-highlight-yellow text-xs tracking-widest mb-2">04 // CHRONO HABITS</h3>
+              <p className="text-white/40 text-[10px] uppercase mb-6 font-mono leading-relaxed">Your absolute peak historical listening hour and day of the week.</p>
+              <div className="flex flex-col gap-4">
+                <div>
+                  <div className="text-3xl font-black tracking-tighter text-white">{behavioralStats.time_preferences.top_hour}</div>
+                  <div className="text-white/50 text-[10px] font-mono uppercase tracking-widest">Peak Listening Hour</div>
+                </div>
+                <div>
+                  <div className="text-3xl font-black tracking-tighter text-highlight-cyan">{behavioralStats.time_preferences.top_day}</div>
+                  <div className="text-white/50 text-[10px] font-mono uppercase tracking-widest">Peak Listening Day</div>
+                </div>
+              </div>
+            </div>
+
             {/* Loop Obsession */}
-            <div className="glass-panel p-8 group md:col-span-2 lg:col-span-1">
+            <div className="glass-panel p-8 group md:col-span-2 lg:col-span-2">
               <h3 className="font-mono text-white text-lg tracking-widest mb-2">Loop Obsession</h3>
               <p className="text-white/40 text-xs font-mono mb-6">Instances where playback explicitly ended naturally, but you immediately restarted the exact same track.</p>
               <div className="space-y-4">

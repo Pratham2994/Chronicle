@@ -40,7 +40,7 @@ def api_behavioral_stats():
             get_skipper_psychology, get_ghost_tracks, 
             get_vampire_vs_sunlight, get_loop_obsession, get_binge_listen_curve,
             get_loyalty_index, get_one_hit_fixations, get_temporal_splits,
-            get_incognito_sessions, get_short_attention
+            get_incognito_sessions, get_short_attention, get_time_preferences
         )
         return {
             "skipper_psychology": get_skipper_psychology(conn),
@@ -52,7 +52,8 @@ def api_behavioral_stats():
             "one_hit_fixations": get_one_hit_fixations(conn),
             "temporal_splits": get_temporal_splits(conn),
             "incognito_sessions": get_incognito_sessions(conn),
-            "short_attention": get_short_attention(conn)
+            "short_attention": get_short_attention(conn),
+            "time_preferences": get_time_preferences(conn)
         }
     finally:
         conn.close()

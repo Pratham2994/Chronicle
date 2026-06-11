@@ -210,3 +210,31 @@ def get_short_attention(conn: duckdb.DuckDBPyConnection) -> dict:
         "total_skips": t_skips,
         "ratio_percent": round(ratio, 2)
     }
+
+def get_time_preferences(conn: duckdb.DuckDBPyConnection) -> dict:
+    df_hour = conn.execute("""
+        SELECT EXTRACT(hour FROM parsed_ts) as hr, COUNT(*) as c 
+        FROM history 
+        GROUP BY hr ORDER BY c DESC LIMIT 1
+    """).df()
+    
+    df_day = conn.execute("""
+        SELECT EXTRACT(ISODOW FROM parsed_ts) as dow, COUNT(*) as c 
+        FROM history 
+        GROUP BY dow ORDER BY c DESC LIMIT 1
+    """).df()
+    
+    hr = int(df_hour['hr'][0]) if not df_hour.empty else 0
+    dow = int(df_day['dow'][0]) if not df_day.empty else 1
+    
+    days = {1: "Monday", 2: "Tuesday", 3: "Wednesday", 4: "Thursday", 5: "Friday", 6: "Saturday", 7: "Sunday"}
+    
+    ampm = "AM" if hr < 12 else "PM"
+    hr_12 = hr if hr <= 12 else hr - 12
+    if hr_12 == 0: hr_12 = 12
+    hour_str = f"{hr_12}:00 {ampm}"
+    
+    return {
+        "top_hour": hour_str,
+        "top_day": days.get(dow, "Unknown")
+    }
