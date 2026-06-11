@@ -9,6 +9,7 @@ backend/.venv/
 *.py[oc]
 backend/itunes_genre_cache.json
 backend/spotify_history.duckdb*
+backend/genre_cache.json
 
 # Environment
 .env
