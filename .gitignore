@@ -10,6 +10,8 @@ backend/.venv/
 backend/itunes_genre_cache.json
 backend/spotify_history.duckdb*
 backend/genre_cache.json
+backend/profile.json
+backend/.cache
 
 # Environment
 .env
