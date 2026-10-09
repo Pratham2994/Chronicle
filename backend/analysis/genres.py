@@ -6,7 +6,7 @@ import concurrent.futures
 from urllib.parse import quote_plus
 import pandas as pd
 
-CACHE_FILE = "itunes_genre_cache.json"
+CACHE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "itunes_genre_cache.json")
 
 def fetch_itunes_genre(artist):
     try:
@@ -16,9 +16,11 @@ def fetch_itunes_genre(artist):
             data = res.json()
             if data.get('resultCount', 0) > 0:
                 return artist, data['results'][0].get('primaryGenreName', 'Unknown')
+            return artist, 'Unknown'
     except Exception:
         pass
-    return artist, 'Unknown'
+    # No answer at all. It is not written to the cache, so it is asked again next time.
+    return artist, None
 
 def build_genre_cache(conn: duckdb.DuckDBPyConnection):
     df = conn.execute("""
@@ -47,7 +49,8 @@ def build_genre_cache(conn: duckdb.DuckDBPyConnection):
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             results = executor.map(fetch_itunes_genre, missing_artists)
             for artist, genre in results:
-                cache[artist] = genre
+                if genre is not None:
+                    cache[artist] = genre
                 
         with open(CACHE_FILE, 'w', encoding='utf-8') as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
@@ -58,8 +61,9 @@ def fetch_genre_stats(conn: duckdb.DuckDBPyConnection) -> dict:
     cache = build_genre_cache(conn)
     genre_df = pd.DataFrame(list(cache.items()), columns=['artist', 'genre'])
     
-    # We want to register the df so we can query it multiple times cleanly
-    conn.register('genre_mapping', genre_df)
+    # A real table, so the chapters and the places can read the genres on their own connections
+    conn.register('genre_df', genre_df)
+    conn.execute("CREATE OR REPLACE TABLE genre_mapping AS SELECT artist, genre FROM genre_df")
 
     # 1. Top Overall Genres with Artist Examples
     top_overall = conn.execute("""
@@ -148,5 +152,7 @@ def fetch_genre_stats(conn: duckdb.DuckDBPyConnection) -> dict:
         "top_genres": format_df(top_overall, is_top=True) if not top_overall.empty else [],
         "vampire_genres": format_df(vampire_genres) if not vampire_genres.empty else [],
         "sunlight_genres": format_df(sunlight_genres) if not sunlight_genres.empty else [],
-        "cultural_split": culture_stats.to_dict('records') if not culture_stats.empty else []
+        "cultural_split": culture_stats.to_dict('records') if not culture_stats.empty else [],
+        "artists_checked": len(cache),
+        "artists_known": int((genre_df['genre'] != 'Unknown').sum()) if not genre_df.empty else 0
     }

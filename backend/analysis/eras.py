@@ -1,31 +1,22 @@
 import duckdb
 
-def get_era_stats(conn: duckdb.DuckDBPyConnection):
-    # Create a temporary view to classify rows into Eras based on User's exact academic dates
+def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
+    """chapters: [{name, start, end}] with ISO dates, in order, with no overlap."""
+    if not chapters:
+        return []
+
+    # A play belongs to the chapter its local date falls in. A play between chapters belongs to none.
+    conn.execute("CREATE OR REPLACE TEMP TABLE chapter_list (era_name VARCHAR, era_order INTEGER, start_d DATE, end_d DATE)")
+    conn.executemany(
+        "INSERT INTO chapter_list VALUES (?, ?, ?, ?)",
+        [[c["name"], i + 1, c["start"], c["end"]] for i, c in enumerate(chapters)],
+    )
     conn.execute("""
     CREATE OR REPLACE TEMP VIEW Eras AS
-    SELECT 
-        *,
-        CASE 
-            WHEN parsed_ts < '2020-02-06' THEN 'The School Days'
-            WHEN parsed_ts >= '2020-02-06' AND parsed_ts <= '2022-10-31' THEN 'Junior College'
-            WHEN parsed_ts >= '2022-11-01' AND parsed_ts <= '2023-07-31' THEN 'Freshman Year'
-            WHEN parsed_ts >= '2023-08-01' AND parsed_ts <= '2024-06-01' THEN 'Sophomore Year'
-            WHEN parsed_ts >= '2024-08-01' AND parsed_ts <= '2025-07-31' THEN 'Junior Year'
-            WHEN parsed_ts >= '2025-08-01' AND parsed_ts <= '2026-07-31' THEN 'Senior Year'
-            ELSE 'Summer / Gap'
-        END AS era_name,
-        CASE 
-            WHEN parsed_ts < '2020-02-06' THEN 1
-            WHEN parsed_ts >= '2020-02-06' AND parsed_ts <= '2022-10-31' THEN 2
-            WHEN parsed_ts >= '2022-11-01' AND parsed_ts <= '2023-07-31' THEN 3
-            WHEN parsed_ts >= '2023-08-01' AND parsed_ts <= '2024-06-01' THEN 4
-            WHEN parsed_ts >= '2024-08-01' AND parsed_ts <= '2025-07-31' THEN 5
-            WHEN parsed_ts >= '2025-08-01' AND parsed_ts <= '2026-07-31' THEN 6
-            ELSE 7
-        END AS era_order
-    FROM history
-    WHERE parsed_ts IS NOT NULL
+    SELECT h.*, c.era_name, c.era_order
+    FROM history h
+    JOIN chapter_list c ON CAST(h.parsed_ts AS DATE) BETWEEN c.start_d AND c.end_d
+    WHERE h.parsed_ts IS NOT NULL
     """)
 
     # 1. Exploration Decay Curve
@@ -35,6 +26,7 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection):
         era_order,
         COUNT(DISTINCT master_metadata_album_artist_name) as unique_artists,
         COUNT(*) as total_plays,
+        SUM(ms_played) as ms_played,
         COUNT(DISTINCT master_metadata_album_artist_name) * 1.0 / NULLIF(COUNT(*), 0) as discovery_ratio
     FROM Eras
     WHERE era_name != 'Summer / Gap'
@@ -314,8 +306,14 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection):
         
         top_artists = list(artist_row['top_artists'].values[0]) if not artist_row.empty else []
 
+        chapter = chapters[int(decay_df.iloc[i]['era_order']) - 1]
+
         eras_data.append({
             "era_name": era_name,
+            "start": chapter["start"],
+            "end": chapter["end"],
+            "hours": round(float(decay_df.iloc[i]['ms_played']) / 3600000, 1),
+            "plays": int(decay_df.iloc[i]['total_plays']),
             "discovery_ratio": round(float(decay_df.iloc[i]['discovery_ratio']), 4),
             "unique_artists": int(decay_df.iloc[i]['unique_artists']),
             "mobile_pct": mobile_pct,

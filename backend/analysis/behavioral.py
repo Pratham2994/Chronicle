@@ -23,8 +23,10 @@ def get_skipper_psychology(conn: duckdb.DuckDBPyConnection) -> dict:
         USING SAMPLE 100000
     """).df()
 
-    if df.empty or df['skipped'].sum() == 0:
-        return {"insight": "[ ERR: INSUFFICIENT TELEMETRY FOR SKIP ANALYSIS ]"}
+    # The model needs both kinds of play to learn from
+    if df.empty or df['skipped'].nunique() < 2:
+        return {"insight": "There are too few skips in this history to find a pattern.", "coefficients": {}}
+    df['shuffle'] = df['shuffle'].fillna(False).astype(bool)
 
     X = df[['hour_of_day', 'shuffle', 'platform_type']]
     y = df['skipped']
@@ -72,7 +74,7 @@ def get_ghost_tracks(conn: duckdb.DuckDBPyConnection) -> list:
                 master_metadata_track_name as name,
                 master_metadata_album_artist_name as artist,
                 COUNT(*) as total_plays,
-                SUM(CASE WHEN parsed_ts >= '2024-01-01' THEN 1 ELSE 0 END) as recent_plays
+                SUM(CASE WHEN parsed_ts >= (SELECT max(parsed_ts) FROM history) - INTERVAL 2 YEAR THEN 1 ELSE 0 END) as recent_plays
             FROM history
             WHERE master_metadata_track_name IS NOT NULL
             GROUP BY name, artist
@@ -93,8 +95,8 @@ def get_vampire_vs_sunlight(conn: duckdb.DuckDBPyConnection) -> dict:
         FROM history
     """).df()
     
-    v = int(df['vampire_plays'][0])
-    s = int(df['sunlight_plays'][0])
+    v = int(df['vampire_plays'][0] or 0)
+    s = int(df['sunlight_plays'][0] or 0)
     
     return {
         "vampire_plays": v,
@@ -107,6 +109,7 @@ def get_loop_obsession(conn: duckdb.DuckDBPyConnection) -> dict:
         WITH ordered_history AS (
             SELECT 
                 master_metadata_track_name as name,
+                master_metadata_album_artist_name as artist,
                 reason_start,
                 reason_end,
                 LAG(master_metadata_track_name) OVER (ORDER BY parsed_ts) as prev_track,
@@ -114,7 +117,7 @@ def get_loop_obsession(conn: duckdb.DuckDBPyConnection) -> dict:
             FROM history
             WHERE master_metadata_track_name IS NOT NULL
         )
-        SELECT name, COUNT(*) as loop_count
+        SELECT name, COUNT(*) as loop_count, MAX(artist) as artist
         FROM ordered_history
         WHERE name = prev_track 
           AND reason_start = 'trackdone' 
@@ -129,6 +132,7 @@ def get_binge_listen_curve(conn: duckdb.DuckDBPyConnection) -> dict:
     df = conn.execute("""
         SELECT 
             master_metadata_track_name as name,
+            MAX(master_metadata_album_artist_name) as artist,
             CAST(parsed_ts AS DATE) as play_date,
             COUNT(*) as daily_plays
         FROM history
@@ -143,8 +147,9 @@ def get_binge_listen_curve(conn: duckdb.DuckDBPyConnection) -> dict:
         
     return {
         "name": df['name'][0],
+        "artist": df['artist'][0],
         "max_plays_in_24h": int(df['daily_plays'][0]),
-        "date": str(df['play_date'][0])
+        "date": str(df['play_date'][0])[:10]
     }
 
 def get_loyalty_index(conn: duckdb.DuckDBPyConnection) -> dict:
@@ -187,8 +192,8 @@ def get_temporal_splits(conn: duckdb.DuckDBPyConnection) -> dict:
             SUM(CASE WHEN EXTRACT(ISODOW FROM parsed_ts) IN (1,2,3,4,5) THEN 1 ELSE 0 END) as weekday_plays
         FROM history
     """).df()
-    wp = int(df['weekend_plays'][0])
-    wd = int(df['weekday_plays'][0])
+    wp = int(df['weekend_plays'][0] or 0)
+    wd = int(df['weekday_plays'][0] or 0)
     return {"weekend_plays": wp, "weekday_plays": wd}
 
 def get_incognito_sessions(conn: duckdb.DuckDBPyConnection) -> int:
@@ -202,8 +207,8 @@ def get_short_attention(conn: duckdb.DuckDBPyConnection) -> dict:
             SUM(CASE WHEN reason_end = 'fwdbtn' THEN 1 ELSE 0 END) as total_skips
         FROM history
     """).df()
-    i_skips = int(df['instant_skips'][0])
-    t_skips = int(df['total_skips'][0])
+    i_skips = int(df['instant_skips'][0] or 0)
+    t_skips = int(df['total_skips'][0] or 0)
     ratio = (i_skips / max(t_skips, 1)) * 100 if t_skips > 0 else 0
     return {
         "instant_skips": i_skips,
