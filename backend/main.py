@@ -169,6 +169,8 @@ def api_recalibrate():
 async def api_upload(files: list[UploadFile] = File(...)):
     try:
         saved = database.save_uploads([(f.filename or "", await f.read()) for f in files])
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=f"{e} Nothing was changed.")
     except Exception:
         raise HTTPException(status_code=422, detail="That file could not be read. Is it the zip from Spotify?")
     if not saved:

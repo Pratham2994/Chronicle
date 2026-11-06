@@ -218,15 +218,17 @@ def get_short_attention(conn: duckdb.DuckDBPyConnection) -> dict:
 
 def get_time_preferences(conn: duckdb.DuckDBPyConnection) -> dict:
     df_hour = conn.execute("""
-        SELECT EXTRACT(hour FROM parsed_ts) as hr, COUNT(*) as c 
-        FROM history 
-        GROUP BY hr ORDER BY c DESC LIMIT 1
+        SELECT EXTRACT(hour FROM parsed_ts) as hr, SUM(ms_played) as ms
+        FROM history
+        WHERE parsed_ts IS NOT NULL
+        GROUP BY hr ORDER BY ms DESC LIMIT 1
     """).df()
     
     df_day = conn.execute("""
-        SELECT EXTRACT(ISODOW FROM parsed_ts) as dow, COUNT(*) as c 
-        FROM history 
-        GROUP BY dow ORDER BY c DESC LIMIT 1
+        SELECT EXTRACT(ISODOW FROM parsed_ts) as dow, SUM(ms_played) as ms
+        FROM history
+        WHERE parsed_ts IS NOT NULL
+        GROUP BY dow ORDER BY ms DESC LIMIT 1
     """).df()
     
     hr = int(df_hour['hr'][0]) if not df_hour.empty else 0

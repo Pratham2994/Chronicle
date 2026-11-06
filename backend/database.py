@@ -1,5 +1,6 @@
 import glob
 import io
+import json
 import os
 import zipfile
 
@@ -41,6 +42,9 @@ def init_db(timezone: str):
     try:
         if not has_history(conn):
             _ingest_data(conn, timezone)
+    except Exception as e:
+        # A bad file must not stop the server; the page can still show what to do
+        print(f"Could not load the history: {e}")
     finally:
         conn.close()
 
@@ -48,8 +52,6 @@ def init_db(timezone: str):
 def rebuild_db(timezone: str):
     conn = get_db_connection()
     try:
-        conn.execute("DROP TABLE IF EXISTS history")
-        conn.execute("DROP TABLE IF EXISTS genre_mapping")
         _ingest_data(conn, timezone)
     finally:
         conn.close()
@@ -61,21 +63,49 @@ def set_timezone(conn, timezone: str):
 
 
 def _ingest_data(conn, timezone: str):
+    """Reads every audio file into a new table, then swaps it in. If anything fails, the old table stays."""
     os.makedirs(DATA_DIR, exist_ok=True)
     files = audio_files()
+    conn.execute("DROP TABLE IF EXISTS history_new")
     if not files:
         print(f"No {AUDIO_PREFIX}*.json files in {DATA_DIR}.")
+        conn.execute("DROP TABLE IF EXISTS history")
+        conn.execute("DROP TABLE IF EXISTS genre_mapping")
         return
 
     print(f"Found {len(files)} history files. Loading them into DuckDB...")
-    # union_by_name handles the small schema changes between years
-    conn.execute(
-        "CREATE TABLE history AS SELECT * FROM read_json_auto(?, format='array', union_by_name=true)",
-        [files],
-    )
-    conn.execute("ALTER TABLE history ADD COLUMN parsed_ts TIMESTAMP")
-    set_timezone(conn, timezone)
+    try:
+        # union_by_name handles the small schema changes between years
+        conn.execute(
+            "CREATE TABLE history_new AS SELECT * FROM read_json_auto(?, format='array', union_by_name=true)",
+            [files],
+        )
+        conn.execute("ALTER TABLE history_new ADD COLUMN parsed_ts TIMESTAMP")
+        conn.execute("UPDATE history_new SET parsed_ts = timezone(?, CAST(ts AS TIMESTAMPTZ))", [timezone])
+    except Exception:
+        conn.execute("DROP TABLE IF EXISTS history_new")
+        bad = [os.path.basename(f) for f in files if not _readable(f)]
+        if bad:
+            raise ValueError(f"{', '.join(bad)} is not a Spotify history file. Remove it from the data folder.")
+        raise
+    conn.execute("DROP TABLE IF EXISTS history")
+    conn.execute("DROP TABLE IF EXISTS genre_mapping")
+    conn.execute("ALTER TABLE history_new RENAME TO history")
     print("Load complete.")
+
+
+def _is_history(content: bytes) -> bool:
+    """A Spotify history file is a JSON list of plays."""
+    try:
+        data = json.loads(content)
+    except ValueError:
+        return False
+    return isinstance(data, list) and all(isinstance(item, dict) for item in data)
+
+
+def _readable(path: str) -> bool:
+    with open(path, "rb") as f:
+        return _is_history(f.read())
 
 
 def status(conn) -> dict:
@@ -95,15 +125,15 @@ def save_uploads(uploads: list[tuple[str, bytes]]) -> list[str]:
     zip that Spotify sends. Everything else in the zip is ignored.
     """
     os.makedirs(DATA_DIR, exist_ok=True)
-    saved = []
+    found: dict[str, bytes] = {}
 
     def keep(name: str, content: bytes):
         # Only the file name is used, so a path inside a zip cannot write outside data/.
         base = os.path.basename(name.replace("\\", "/"))
         if base.startswith(AUDIO_PREFIX) and base.endswith(".json") and base != SAMPLE_FILE:
-            with open(os.path.join(DATA_DIR, base), "wb") as f:
-                f.write(content)
-            saved.append(base)
+            if not _is_history(content):
+                raise ValueError(f"{base} is not a Spotify history file.")
+            found[base] = content
 
     for name, content in uploads:
         if name.lower().endswith(".zip"):
@@ -113,6 +143,12 @@ def save_uploads(uploads: list[tuple[str, bytes]]) -> list[str]:
                         keep(member, archive.read(member))
         else:
             keep(name, content)
+
+    # Every file was checked above, so a bad one leaves data/ exactly as it was
+    for base, content in found.items():
+        with open(os.path.join(DATA_DIR, base), "wb") as f:
+            f.write(content)
+    saved = list(found)
 
     # Real history replaces the sample. The two are never mixed.
     sample = os.path.join(DATA_DIR, SAMPLE_FILE)

@@ -29,7 +29,6 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
         SUM(ms_played) as ms_played,
         COUNT(DISTINCT master_metadata_album_artist_name) * 1.0 / NULLIF(COUNT(*), 0) as discovery_ratio
     FROM Eras
-    WHERE era_name != 'Summer / Gap'
     GROUP BY era_name, era_order
     ORDER BY era_order
     """
@@ -43,7 +42,6 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
         SUM(CASE WHEN platform ILIKE '%iOS%' OR platform ILIKE '%Android%' THEN 1 ELSE 0 END) as mobile_plays,
         SUM(CASE WHEN platform ILIKE '%Windows%' OR platform ILIKE '%Mac%' OR platform ILIKE '%web%' THEN 1 ELSE 0 END) as desktop_plays
     FROM Eras
-    WHERE era_name != 'Summer / Gap'
     GROUP BY era_name, era_order
     ORDER BY era_order
     """
@@ -58,7 +56,6 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
             CAST(parsed_ts AS DATE) as play_date,
             COUNT(*) as daily_plays
         FROM Eras
-        WHERE era_name != 'Summer / Gap'
         GROUP BY era_name, era_order, play_date
     )
     SELECT 
@@ -82,7 +79,6 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
             SUM(ms_played) as ms_played
         FROM Eras
         WHERE master_metadata_album_artist_name IS NOT NULL
-          AND era_name != 'Summer / Gap'
         GROUP BY era_name, era_order, artist
     ),
     RankedArtists AS (
@@ -115,7 +111,6 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
             SUM(ms_played) as ms_played
         FROM Eras
         WHERE master_metadata_track_name IS NOT NULL
-          AND era_name != 'Summer / Gap'
         GROUP BY era_name, era_order, track_name, artist_name
     ),
     RankedTracks AS (
@@ -139,16 +134,16 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
             era_name,
             master_metadata_track_name as track,
             reason_start,
-            reason_end,
-            LAG(master_metadata_track_name) OVER (ORDER BY parsed_ts) as prev_track
+            LAG(master_metadata_track_name) OVER (ORDER BY parsed_ts) as prev_track,
+            LAG(reason_end) OVER (ORDER BY parsed_ts) as prev_end
         FROM Eras
         WHERE master_metadata_track_name IS NOT NULL
     )
     SELECT era_name, track, COUNT(*) as loops
     FROM Shifts
     WHERE track = prev_track 
-      AND reason_start = 'trackdone' 
-      AND reason_end = 'trackdone'
+      AND reason_start = 'trackdone'
+      AND prev_end = 'trackdone'
     GROUP BY era_name, track
     HAVING COUNT(*) > 3
     """
@@ -167,7 +162,7 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
                 SUM(e.ms_played) as ms_played
             FROM Eras e
             JOIN genre_mapping g ON e.master_metadata_album_artist_name = g.artist
-            WHERE g.genre != 'Unknown' AND e.era_name != 'Summer / Gap'
+            WHERE g.genre != 'Unknown'
             GROUP BY e.era_name, e.era_order, g.genre
         ),
         RankedGenres AS (
@@ -191,7 +186,6 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
         strftime(parsed_ts, '%Y-%m') as month,
         SUM(ms_played) as ms_played
     FROM Eras
-    WHERE era_name != 'Summer / Gap'
     GROUP BY era_name, era_order, month
     ORDER BY era_order, month
     """
@@ -210,7 +204,6 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
     EraBoundaries AS (
         SELECT era_name, MIN(parsed_ts) as era_start, MAX(parsed_ts) as era_end
         FROM Eras
-        WHERE era_name != 'Summer / Gap'
         GROUP BY era_name
     ),
     EraDiscoveries AS (
@@ -223,7 +216,6 @@ def get_era_stats(conn: duckdb.DuckDBPyConnection, chapters: list[dict]):
         JOIN EraBoundaries eb ON e.era_name = eb.era_name
         WHERE afp.first_play >= eb.era_start 
           AND afp.first_play <= eb.era_end
-          AND e.era_name != 'Summer / Gap'
         GROUP BY e.era_name, e.master_metadata_album_artist_name
     ),
     RankedDiscoveries AS (

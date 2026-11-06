@@ -123,7 +123,7 @@ def fetch_genre_stats(conn: duckdb.DuckDBPyConnection) -> dict:
     
     # 4. Global vs Regional Cultural Footprint
     # We heuristically categorize known regional genres vs global english-dominated genres
-    regional_keywords = ['bollywood', 'tamil', 'telugu', 'j-pop', 'k-pop', 'latin', 'regional', 'indian', 'french', 'spanish', 'c-pop', 'punjabi']
+    regional_keywords = ['bollywood', 'tamil', 'telugu', 'j-pop', 'k-pop', 'latin', 'regional', 'indian', 'french', 'spanish', 'c-pop', 'punjabi', 'hindi', 'world', 'arabic', 'afro', 'reggaeton', 'anime']
     
     # Create the column natively in python based on fetched genres
     genre_df['cultural_category'] = genre_df['genre'].apply(
